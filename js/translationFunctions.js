@@ -102,24 +102,24 @@ async function retranslateSubtitle(index, {
             }
             
             // Egyedi azonosító a fordítandó sorhoz
-            const uniqueMarker = "###FORDÍTANDÓ_SOR###";
-            const endMarker = "###FORDÍTÁS_VÉGE###";
+            const uniqueMarker = "###LINE_TO_TRANSLATE###";
+            const endMarker = "###COMPILATION_END###";
             
             // Teljes kontextus összeállítása
             let contextText = "";
             if (previousContext) {
-                contextText += "Előző sorok kontextusként (NEM kell fordítani):\n" + previousContext + "\n";
+                contextText += "Previous lines as context (do NOT need to be translated):\n" + previousContext + "\n";
             }
             contextText += uniqueMarker + "\n" + currentSubtitle + "\n" + endMarker + "\n";
             if (nextContext) {
-                contextText += "Következő sorok kontextusként (NEM kell fordítani):\n" + nextContext;
+                contextText += "The following lines are for context (do NOT need to be translated):\n" + nextContext;
             }
             
             // Fordítási utasítás
-            const systemPrompt = `Fordítsd le CSAK a "${uniqueMarker}" és "${endMarker}" közötti szöveget ${getLanguageNameLocal(sourceLanguage)} nyelvről ${getLanguageNameLocal(targetLanguage)} nyelvre. 
-A többi szöveg csak kontextus, azt NE fordítsd le. 
-A fordításodban KIZÁRÓLAG a lefordított szöveget add vissza, semmilyen jelölést, magyarázatot vagy egyéb szöveget NE adj hozzá.
-NE használd a "${uniqueMarker}" vagy "${endMarker}" jelöléseket a válaszodban.`;
+            const systemPrompt = `Translate ONLY the text between "${uniqueMarker}" and "${endMarker}" from ${getLanguageNameLocal(sourceLanguage)} to ${getLanguageNameLocal(targetLanguage)}. 
+The rest of the text is just context, DO NOT translate it.
+In your translation, ONLY return the translated text, DO NOT add any markup, explanation, or other text.
+DO NOT use the "${uniqueMarker}" or "${endMarker}" markers in your response.`;
             
             // Fordítás végrehajtása az OpenRouter API-val a kiválasztott modellel
             const rawTranslatedText = await translateWithOpenRouterApi(
@@ -246,24 +246,25 @@ async function translateSequentially(startIndex, sourceLanguage, targetLanguage,
             }
             
             // Egyedi azonosító a fordítandó sorhoz
-            const uniqueMarker = "###FORDÍTANDÓ_SOR###";
-            const endMarker = "###FORDÍTÁS_VÉGE###";
+            const uniqueMarker = "###LINE_TO_TRANSLATE###";
+            const endMarker = "###COMPILATION_END###";
             
             // Teljes kontextus összeállítása
             let contextText = "";
             if (previousContext) {
-                contextText += "Előző sorok kontextusként (NEM kell fordítani):\n" + previousContext + "\n";
+                contextText += "Previous lines as context (do NOT need to be translated):\n" + previousContext + "\n";
             }
             contextText += uniqueMarker + "\n" + currentSubtitle + "\n" + endMarker + "\n";
             if (nextContext) {
-                contextText += "Következő sorok kontextusként (NEM kell fordítani):\n" + nextContext;
+                contextText += "The following lines are for context (do NOT need to be translated):\n" + nextContext;
             }
             
             // Fordítási utasítás
-            const systemPrompt = `Fordítsd le CSAK a "${uniqueMarker}" és "${endMarker}" közötti szöveget ${getLanguageNameLocal(sourceLanguage)} nyelvről ${getLanguageNameLocal(targetLanguage)} nyelvre. 
-A többi szöveg csak kontextus, azt NE fordítsd le. 
-A fordításodban KIZÁRÓLAG a lefordított szöveget add vissza, semmilyen jelölést, magyarázatot vagy egyéb szöveget NE adj hozzá.
-NE használd a "${uniqueMarker}" vagy "${endMarker}" jelöléseket a válaszodban.`;
+            const systemPrompt = `Translate ONLY the text between "${uniqueMarker}" and "${endMarker}" from ${getLanguageNameLocal(sourceLanguage)} to ${getLanguageNameLocal(targetLanguage)}. 
+The rest of the text is just context, DO NOT translate it.
+In your translation, ONLY return the translated text, DO NOT add any markup, explanation, or other text.
+DO NOT use the "${uniqueMarker}" or "${endMarker}" markers in your response.`;
+            
             
             // Segédfüggvény a nyelv kódjának névvé alakításához
             function getLanguageNameLocal(languageCode) {
@@ -1016,7 +1017,7 @@ function getLanguageNameLocal(languageCode) {
 }
 
 // Szöveg fordítása kontextussal az LM Studio API-val
-async function translateTextWithContext(subtitles, currentIndex, sourceLanguage, targetLanguage, retryCount = 0, temperature, { getLanguageName }) {
+async function translateTextWithContext(subtitles, currentIndex, sourceLanguage, targetLanguage, retryCount = 0, temperature, { getLanguageName }, promptComplementText="") {
     try {
         // Kontextus összeállítása (előző és következő mondatok)
         const currentSubtitle = subtitles[currentIndex].text;
@@ -1027,14 +1028,16 @@ async function translateTextWithContext(subtitles, currentIndex, sourceLanguage,
         // Előző mondatok hozzáadása a kontextushoz (max 4)
         for (let i = 1; i <= 4; i++) {
             if (currentIndex - i >= 0) {
-                context += `Előző mondat ${i}: "${subtitles[currentIndex - i].text}"\n`;
+                context += `Previous sentence ${i}: ${subtitles[currentIndex - i].text}\n`;
             }
         }
         
+        context += `Sentence to translate : ${currentSubtitle}\n`;
+
         // Következő mondatok hozzáadása a kontextushoz (max 4)
         for (let i = 1; i <= 4; i++) {
             if (currentIndex + i < subtitles.length) {
-                context += `Következő mondat ${i}: "${subtitles[currentIndex + i].text}"\n`;
+                context += `Next sentence ${i}: ${subtitles[currentIndex + i].text}\n`;
             }
         }
         
@@ -1042,13 +1045,18 @@ async function translateTextWithContext(subtitles, currentIndex, sourceLanguage,
         const apiUrl = 'http://localhost:1234/v1/completions';
         
         // Fordítási prompt összeállítása kontextussal
-        let prompt = `Te egy professzionális fordító vagy, aki ${getLanguageName(sourceLanguage)} nyelvről ${getLanguageName(targetLanguage)} nyelvre fordít egy filmfeliratot. A fordításnak természetesnek és folyékonynak kell lennie, miközben megőrzi az eredeti jelentést és stílust. Ne használj formázást, kódjelölést vagy idézőjeleket a fordításban.\n\n`;
+        let prompt = `You are a professional translator translating a movie subtitle from ${getLanguageName(sourceLanguage)} to ${getLanguageName(targetLanguage)}. The translation should be natural and fluent, while preserving the original meaning and style. Do not use formatting, code notation, or quotation marks in the translation.\n`;
         
+        if (promptComplementText != "") {
+            prompt += promptComplementText + "\n\n"
+        }
         if (context) {
-            prompt += `Kontextus a jobb fordításhoz:\n${context}\n`;
+            prompt += `Context for better translation:\n${context}\n`;
         }
         
-        prompt += `Fordítandó mondat: "${currentSubtitle}"\n\nFordítás:`;
+        prompt += `Return me only this line, with nothing else : ${currentSubtitle}\n\nTranslate:`;
+
+        console.log('Prompt envoyé: ', prompt)
         
         // Fordítási kérés összeállítása
         const response = await fetch(apiUrl, {
@@ -1075,7 +1083,7 @@ async function translateTextWithContext(subtitles, currentIndex, sourceLanguage,
         
         // Válasz szöveg ellenőrzése
         const responseText = await response.text();
-        console.log('API válasz szöveg:', responseText);
+        console.log('API response text:', responseText);
         
         // Ha a válasz nem JSON formátumú, akkor hibát dobunk
         if (!response.ok) {
@@ -1171,11 +1179,11 @@ async function translateTextWithContext(subtitles, currentIndex, sourceLanguage,
             }
         }
         
-        console.log('Fordítás eredménye:', translatedText);
+        console.log('Translation result:', translatedText);
         
         return translatedText;
     } catch (error) {
-        console.error('Fordítási hiba:', error);
+        console.error('Translation error:', error);
         
         // Újrapróbálkozás hiba esetén, de csak korlátozott számú alkalommal
         if (retryCount < 3) {
@@ -1403,25 +1411,28 @@ async function translateSequentiallyWithOpenRouterUniversal(startIndex, sourceLa
                 }
             }
             
-            // Egyedi azonosító a fordítandó sorhoz
-            const uniqueMarker = "###FORDÍTANDÓ_SOR###";
-            const endMarker = "###FORDÍTÁS_VÉGE###";
+
+
+            const uniqueMarker = "###LINE_TO_TRANSLATE###";
+            const endMarker = "###COMPILATION_END###";
             
             // Teljes kontextus összeállítása
             let contextText = "";
             if (previousContext) {
-                contextText += "Előző sorok kontextusként (NEM kell fordítani):\n" + previousContext + "\n";
+                contextText += "Previous lines as context (do NOT need to be translated):\n" + previousContext + "\n";
             }
             contextText += uniqueMarker + "\n" + currentSubtitle + "\n" + endMarker + "\n";
             if (nextContext) {
-                contextText += "Következő sorok kontextusként (NEM kell fordítani):\n" + nextContext;
+                contextText += "The following lines are for context (do NOT need to be translated):\n" + nextContext;
             }
             
             // Fordítási utasítás
-            const systemPrompt = `Fordítsd le CSAK a "${uniqueMarker}" és "${endMarker}" közötti szöveget ${getLanguageNameLocal(sourceLanguage)} nyelvről ${getLanguageNameLocal(targetLanguage)} nyelvre. 
-A többi szöveg csak kontextus, azt NE fordítsd le. 
-A fordításodban KIZÁRÓLAG a lefordított szöveget add vissza, semmilyen jelölést, magyarázatot vagy egyéb szöveget NE adj hozzá.
-NE használd a "${uniqueMarker}" vagy "${endMarker}" jelöléseket a válaszodban.`;
+            const systemPrompt = `Translate ONLY the text between "${uniqueMarker}" and "${endMarker}" from ${getLanguageNameLocal(sourceLanguage)} to ${getLanguageNameLocal(targetLanguage)}. 
+The rest of the text is just context, DO NOT translate it.
+In your translation, ONLY return the translated text, DO NOT add any markup, explanation, or other text.
+DO NOT use the "${uniqueMarker}" or "${endMarker}" markers in your response.`;
+
+
             
             // Fordítás végrehajtása az OpenRouter API-val a kiválasztott modellel
             let translatedText;
@@ -1611,12 +1622,12 @@ async function translateBatchWithOpenRouterUniversal(startIndex, sourceLanguage,
             }
             
             // Fordítási utasítás
-            const systemPrompt = `Fordítsd le az alábbi számozott mondatokat ${getLanguageNameLocal(sourceLanguage)} nyelvről ${getLanguageNameLocal(targetLanguage)} nyelvre. 
-Minden mondatot külön fordíts le, és tartsd meg a sorszámozást a fordításban is.
-FONTOS: A válaszodban CSAK a lefordított mondatokat add vissza a sorszámokkal együtt, pontosan ugyanolyan formátumban és sorszámozással, ahogy megkaptad.
-Példa a várt formátumra:
-1. [fordított szöveg]
-2. [fordított másik szöveg]`;
+            const systemPrompt = `Translate the following numbered sentences from ${getLanguageNameLocal(sourceLanguage)} to ${getLanguageNameLocal(targetLanguage)}.
+Translate each sentence separately, and keep the numbering in the translation.
+IMPORTANT: In your response, ONLY return the translated sentences with the numbers, in exactly the same format and numbering as you received them.
+Example of the expected format:
+1. [translated text]
+2. [translated other text]`;
             
             // Homokóra animáció megjelenítése a kiválasztott nyelv szerint
             const currentLang = currentLangCode || 'hu';

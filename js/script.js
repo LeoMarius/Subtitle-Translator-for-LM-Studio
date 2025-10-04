@@ -23,6 +23,7 @@ let subtitleTable;
 let fileInfoDiv;
 let fileNameSpan;
 let lineCountSpan;
+let promptComplement;
 let sourceLanguageSelect;
 let targetLanguageSelect;
 let progressContainer;
@@ -129,6 +130,8 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM betöltve, elemek inicializálása");
     
     // DOM elemek kiválasztása és globális változókhoz rendelése
+    promptComplement = document.getElementById('promptComplement')
+
     srtFileInput = document.getElementById('srtFile');
     startTranslationBtn = document.getElementById('startTranslation');
     stopTranslationBtn = document.getElementById('stopTranslation');
@@ -1150,6 +1153,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Folyamatjelző frissítése
             updateProgressBar(i, originalSubtitles.length);
+
+            const promptComplementText = promptComplement.value;
+            console.log(targetLanguage)
             
             try {
                 // Fordítás végrehajtása
@@ -1160,8 +1166,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     targetLanguage,
                     0,
                     temperature,
-                    { getLanguageName }
+                    { getLanguageName },
+                    promptComplementText
                 );
+
                 
                 // Fordított szöveg mentése
                 translatedSubtitles[i] = translatedText;
@@ -1176,7 +1184,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 // Görgetés az aktuális sorhoz
-                scrollToRow(i);
+                // scrollToRow(i);
                 
                 // Mentés gomb engedélyezése
                 saveTranslationBtn.disabled = false;
@@ -1435,41 +1443,41 @@ if (fileName.toLowerCase().endsWith('.wrk') || fileName.toLowerCase().endsWith('
     // Segédfüggvény a nyelv kódjának névvé alakításához
     function getLanguageName(languageCode) {
         const languages = {
-            'en': 'angol',
-            'hu': 'magyar',
-            'de': 'német',
-            'fr': 'francia',
-            'es': 'spanyol',
-            'it': 'olasz',
-            'pt': 'portugál',
-            'nl': 'holland',
-            'pl': 'lengyel',
-            'ru': 'orosz',
-            'ja': 'japán',
-            'zh': 'kínai',
-            'ko': 'koreai',
-            'ar': 'arab',
-            'hi': 'hindi',
-            'tr': 'török',
-            'sv': 'svéd',
-            'da': 'dán',
-            'fi': 'finn',
-            'no': 'norvég',
-            'cs': 'cseh',
-            'sk': 'szlovák',
-            'ro': 'román',
-            'bg': 'bolgár',
-            'hr': 'horvát',
-            'sr': 'szerb',
-            'uk': 'ukrán',
-            'el': 'görög',
-            'he': 'héber',
-            'vi': 'vietnámi',
-            'th': 'thai',
-            'id': 'indonéz',
-            'ms': 'maláj',
-            'fa': 'perzsa',
-            'ur': 'urdu'
+            'en': 'English',
+            'hu': 'Hungarian',
+            'de': 'German',
+            'fr': 'French',
+            'es': 'Spanish',
+            'it': 'Italian',
+            'pt': 'Portuguese',
+            'nl': 'Dutch',
+            'pl': 'Polish',
+            'ru': 'Russian',
+            'ja': 'Japanese',
+            'zh': 'Chinese',
+            'ko': 'Korean',
+            'ar': 'Arabic',
+            'hi': 'Hindi',
+            'tr': 'Turkish',
+            'sv': 'Swedish',
+            'da': 'Danish',
+            'fi': 'Finnish',
+            'no': 'Norwegian',
+            'cs': 'Czech',
+            'sk': 'Slovak',
+            'ro': 'Romanian',
+            'bg': 'Bulgarian',
+            'hr': 'Croatian',
+            'sr': 'Serbian',
+            'uk': 'Ukrainian',
+            'el': 'Greek',
+            'he': 'Hebrew',
+            'vi': 'Vietnamese',
+            'th': 'Thai',
+            'id': 'Indonesian',
+            'ms': 'Malay',
+            'fa': 'Persian',
+            'ur': 'Urdu'
         };
         
         return languages[languageCode] || languageCode;
